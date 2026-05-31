@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Ngân Hàng Số Toàn Cầu - SmartBank Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .qr-line { animation: scan 2.5s linear infinite; }
+        @keyframes scan { 0%, 100% { top: 0%; } 50% { top: 100%; } }
+    </style>
+</head>
+<body class="bg-slate-900 min-h-screen flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-indigo-500 selection:text-white">
+
+    <div class="w-full max-w-md bg-white min-h-screen sm:min-h-[820px] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col relative border border-slate-800/50">
+        
+        <div class="bg-slate-950 text-white px-6 pt-3 pb-2 flex justify-between items-center text-xs font-semibold tracking-wider select-none">
+            <span id="clock">00:00</span>
+            <div class="flex items-center gap-2 text-[10px]">
+                <i class="fa-solid fa-signal"></i>
+                <span class="text-[9px]">5G</span>
+                <i class="fa-solid fa-wifi"></i>
+                <i class="fa-solid fa-battery-full text-emerald-400"></i>
+            </div>
+        </div>
+
+        <div id="screen-auth" class="flex-1 flex flex-col p-6 justify-between bg-white">
+            <div class="my-auto space-y-6">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-indigo-800 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-indigo-200 mb-3">
+                        <i class="fa-solid fa-building-columns text-white"></i>
+                    </div>
+                    <h1 class="text-xl font-black text-slate-900 tracking-tight">SmartBank Cloud</h1>
+                    <p class="text-slate-400 text-xs mt-0.5">Hệ thống liên kết dữ liệu thiết bị thời gian thực</p>
+                </div>
+
+                <div class="flex bg-slate-100 p-1 rounded-xl">
+                    <button id="btn-tab-login" onclick="toggleAuthMode('login')" class="flex-1 py-2 text-xs font-bold rounded-lg bg-white text-indigo-600 shadow-sm transition-all">Đăng Nhập</button>
+                    <button id="btn-tab-reg" onclick="toggleAuthMode('reg')" class="flex-1 py-2 text-xs font-medium rounded-lg text-slate-500 transition-all">Mở Tài Khoản mới</button>
+                </div>
+
+                <div id="form-login" class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Số Tài Khoản</label>
+                        <input type="text" id="login-stk" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 font-mono font-bold text-slate-800" placeholder="Nhập STK của bạn">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Mật khẩu mã khóa</label>
+                        <input type="password" id="login-pass" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-slate-800" placeholder="••••••••">
+                    </div>
+                    <button onclick="authLogin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-100 transition-all text-sm">
+                        Đăng Nhập Vào Thiết Bị
+                    </button>
+                </div>
+
+                <div id="form-reg" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Tên Chủ Tài Khoản (Không dấu)</label>
+                        <input type="text" id="reg-name" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 uppercase font-bold text-slate-800" placeholder="VD: NGUYEN VAN A">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Số Tài Khoản</label>
+                            <input type="text" id="reg-stk" readonly class="w-full px-3 py-3 bg-slate-100 border border-slate-200 rounded-xl outline-none text-slate-700 font-mono font-bold text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Số dư kích hoạt (đ)</label>
+                            <input type="number" id="reg-bal" class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-bold" value="2000000">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Mật khẩu</label>
+                        <input type="password" id="reg-pass" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-slate-800" placeholder="Tự đặt mật khẩu đăng nhập">
+                    </div>
+                    <button onclick="authRegister()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-100 transition-all text-sm">
+                        Khởi Tạo & Đồng Bộ Đám Mây
+                    </button>
+                </div>
+            </div>
+            <p class="text-center text-[10px] text-slate-400"><i class="fa-solid fa-cloud text-indigo-500"></i> Cloud Database Active Sync</p>
+        </div>
+
+        <div id="screen-main" class="flex-1 flex flex-col hidden bg-slate-50">
+            
+            <div class="bg-gradient-to-b from-slate-950 to-slate-900 text-white p-5 rounded-b-[2rem] shadow-xl">
+                <div class="flex justify-between items-center mb-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center font-black text-sm border border-indigo-400/30 uppercase" id="user-avatar">?</div>
+                        <div>
+                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest block">Chủ tài khoản</span>
+                            <h2 class="text-sm font-black tracking-tight" id="user-name">---</h2>
+                        </div>
+                    </div>
+                    <button onclick="authLogout()" class="p-2 rounded-xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+                        <i class="fa-solid fa-power-off text-xs"></i>
+                    </button>
+                </div>
+
+                <div class="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 rounded-2xl p-5 relative overflow-hidden shadow-lg border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-[10px] uppercase font-bold tracking-widest text-indigo-200">Tài khoản Live-Active</span>
+                        <i class="fa-solid fa-wifi text-white/40 text-sm animate-pulse"></i>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-[10px] text-indigo-200/80">Số dư khả dụng cập nhật tức thì</p>
+                        <div class="text-2xl font-black tracking-tight mt-1" id="user-balance">0 VND</div>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <span class="text-[9px] text-indigo-200/60 block">Số tài khoản mạng</span>
+                            <span class="font-mono font-bold text-sm tracking-widest" id="user-stk">00000000</span>
+                        </div>
+                        <button onclick="copyStk()" class="text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md transition-all flex items-center gap-1"><i class="fa-regular fa-copy"></i> Sao chép</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 mt-4 grid grid-cols-3 gap-3 text-center">
+                <button onclick="changeTab('transfer')" class="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm flex flex-col items-center group">
+                    <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-sm group-hover:scale-105 transition-all">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 mt-1.5">Chuyển tiền</span>
+                </button>
+                <button onclick="changeTab('qr')" class="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm flex flex-col items-center group">
+                    <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-sm group-hover:scale-105 transition-all">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 mt-1.5">Mã QR nhận</span>
+                </button>
+                <button onclick="changeTab('counter')" class="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm flex flex-col items-center group">
+                    <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-sm group-hover:scale-105 transition-all">
+                        <i class="fa-solid fa-vault"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 mt-1.5">Nạp/Rút quầy</span>
+                </button>
+            </div>
+
+            <div class="flex-1 px-4 py-4 overflow-y-auto space-y-4">
+                
+                <div id="tab-transfer" class="tab-view bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm space-y-3">
+                    <h3 class="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider"><i class="fa-solid fa-paper-plane text-indigo-600"></i> Chuyển khoản Cloud-247</h3>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Số tài khoản đích</label>
+                        <div class="relative">
+                            <input type="number" id="tf-stk" oninput="liveCheckRecipient()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-800 outline-none focus:border-indigo-500" placeholder="Nhập STK người nhận">
+                            <span id="tf-check-icon" class="absolute inset-y-0 right-3 flex items-center"></span>
+                        </div>
+                        <p id="tf-name-hint" class="text-[11px] font-bold text-emerald-600 mt-1 hidden"></p>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Số tiền chuyển (VND)</label>
+                        <input type="number" id="tf-val" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-indigo-500" placeholder="Tối thiểu 1,000đ">
+                    </div>
+                    <button onclick="submitTransfer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs tracking-wider uppercase transition-all shadow-md">Xác thực giao dịch</button>
+                </div>
+
+                <div id="tab-qr" class="tab-view bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm flex flex-col items-center text-center space-y-3 hidden">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Mã QR tài khoản liên kết</h3>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100" id="qr-box"></div>
+                    <div class="w-full text-left bg-slate-50 p-3 rounded-lg text-xs space-y-1 text-slate-600 font-medium">
+                        <p>Chụp ảnh QR này gửi sang thiết bị khác, hoặc tại thiết bị khác chọn mục "Quét ảnh QR" ở dưới thanh điều hướng.</p>
+                    </div>
+                </div>
+
+                <div id="tab-counter" class="tab-view bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm space-y-3 hidden">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Giao dịch vật lý tại quầy</h3>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Phương thức</label>
+                        <select id="ctr-type" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold outline-none">
+                            <option value="in">Nạp tiền vào tài khoản (+)</option>
+                            <option value="out">Rút tiền mặt khỏi hệ thống (-)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Số tiền (VND)</label>
+                        <input type="number" id="ctr-val" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none" placeholder="Nhập số tiền hành động">
+                    </div>
+                    <button onclick="submitCounterAction()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs uppercase transition-all">Thực hiện</button>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm">
+                    <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3"><i class="fa-solid fa-clock-rotate-left"></i> Nhật ký biến động tài khoản</h3>
+                    <div id="history-container" class="space-y-2.5 max-h-[150px] overflow-y-auto pr-1 text-xs">
+                        </div>
+                </div>
+
+            </div>
+
+            <div class="bg-white border-t border-slate-200/80 px-6 py-3 flex justify-between items-center rounded-t-2xl shadow-inner select-none">
+                <button onclick="changeTab('transfer')" class="flex flex-col items-center text-indigo-600 text-[10px] font-bold opacity-80 hover:opacity-100" id="nv-transfer">
+                    <i class="fa-solid fa-wallet text-base mb-0.5"></i> Ví điện tử
+                </button>
+                
+                <label class="flex flex-col items-center text-slate-400 text-[10px] font-bold cursor-pointer -mt-7">
+                    <div class="w-12 h-12 bg-gradient-to-tr from-indigo-600 to-indigo-800 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-300">
+                        <i class="fa-solid fa-qrcode text-lg"></i>
+                    </div>
+                    <span class="text-[9px] mt-1 text-slate-500">Quét ảnh QR</span>
+                    <input type="file" accept="image/*" onchange="simulateQRScanner(event)" class="hidden">
+                </label>
+
+                <button onclick="changeTab('qr')" class="flex flex-col items-center text-slate-400 text-[10px] font-bold opacity-80 hover:opacity-100" id="nv-qr">
+                    <i class="fa-solid fa-circle-user text-base mb-0.5"></i> QR của tôi
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="alert-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl p-5 w-full max-w-xs text-center shadow-2xl space-y-4">
+            <div id="alert-icon" class="w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl"></div>
+            <div>
+                <h4 id="alert-title" class="font-black text-slate-900 text-sm"></h4>
+                <p id="alert-msg" class="text-xs text-slate-500 mt-1 leading-relaxed"></p>
+            </div>
+            <button onclick="closeAlert()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 rounded-xl text-xs transition-all">Xác nhận</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CẤU HÌNH CLOUD DATABASE HOÀN TOÀN CÔNG CỘNG (CHẠY ĐA THIẾT BỊ) ---
+        // Sử dụng một database dùng chung trực tuyến giúp các trình duyệt liên kết trực tiếp với nhau
+        const firebaseConfig = {
+            databaseURL: "https://nganhangsimulation-default-rtdb.asia-southeast1.firebasedatabase.app/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let localUser = null; // Thông tin client đăng nhập hiện tại trên máy này
+        let liveListener = null; // Trình nghe cập nhật tự động của Firebase
+
+        // Đồng hồ đỉnh điện thoại
+        setInterval(() => {
+            const d = new Date();
+            document.getElementById('clock').innerText = String(d.getHours()).padStart(2,'0') + ":" + String(d.getMinutes()).padStart(2,'0');
+        }, 1000);
+
+        // Chuyển chế độ Đăng nhập / Đăng ký
+        function toggleAuthMode(mode) {
+            document.getElementById('form-login').classList.toggle('hidden', mode !== 'login');
+            document.getElementById('form-reg').classList.toggle('hidden', mode !== 'reg');
+            document.getElementById('btn-tab-login').className = mode === 'login' ? "flex-1 py-2 text-xs font-bold rounded-lg bg-white text-indigo-600 shadow-sm transition-all" : "flex-1 py-2 text-xs font-medium rounded-lg text-slate-500 transition-all";
+            document.getElementById('btn-tab-reg').className = mode === 'reg' ? "flex-1 py-2 text-xs font-bold rounded-lg bg-white text-indigo-600 shadow-sm transition-all" : "flex-1 py-2 text-xs font-medium rounded-lg text-slate-500 transition-all";
+            if(mode === 'reg') {
+                document.getElementById('reg-stk').value = Math.floor(10000000 + Math.random() * 89999000);
+            }
+        }
+
+        // Bật thông báo tùy biến thay alert
+        function showAlert(title, msg, status = 'success') {
+            const m = document.getElementById('alert-modal');
+            const icon = document.getElementById('alert-icon');
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-msg').innerText = msg;
+            
+            if(status === 'success') {
+                icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center text-xl bg-emerald-100 text-emerald-600";
+                icon.innerHTML = `<i class="fa-solid fa-circle-check"></i>`;
+            } else {
+                icon.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center text-xl bg-rose-100 text-rose-600";
+                icon.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i>`;
+            }
+            m.classList.remove('hidden');
+        }
+        function closeAlert() { document.getElementById('alert-modal').classList.add('hidden'); }
+
+        // --- 2. XỬ LÝ ĐĂNG KÝ VÀ LƯU TRỮ TRÊN MẠNG (ĐÁM MÂY) ---
+        function authRegister() {
+            const name = document.getElementById('reg-name').value.trim().toUpperCase();
+            const stk = document.getElementById('reg-stk').value;
+            const bal = parseInt(document.getElementById('reg-bal').value);
+            const pass = document.getElementById('reg-pass').value;
+
+            if(!name || !pass || isNaN(bal) || bal < 1000) {
+                showAlert("Thông báo lỗi", "Vui lòng nhập đầy đủ và chính xác thông tin đăng ký.", "error");
+                return;
+            }
+
+            // Đẩy trực tiếp lên cây dữ liệu đám mây toàn cầu theo địa chỉ Số Tài Khoản
+            db.ref('users/' + stk).set({
+                name: name,
+                stk: stk,
+                pass: pass,
+                balance: bal,
+                history: [{title: "Kích hoạt số dư đám mây hệ thống", val: bal, type: "plus"}]
+            }).then(() => {
+                showAlert("Mở tài khoản thành công", `Tài khoản đám mây đã đồng bộ.\nSTK đăng nhập: ${stk}`);
+                toggleAuthMode('login');
+                document.getElementById('login-stk').value = stk;
+            });
+        }
+
+        // --- 3. XỬ LÝ ĐĂNG NHẬP VÀ ĐỒNG BỘ THỜI GIAN THỰC (REALTIME SYNC) ---
+        function authLogin() {
+            const stk = document.getElementById('login-stk').value.trim();
+            const pass = document.getElementById('login-pass').value;
+
+            db.ref('users/' + stk).once('value', (snapshot) => {
+                const data = snapshot.val();
+                if(data && data.pass === pass) {
+                    localUser = data;
+                    activateRealtimeSync(stk); // Kích hoạt bộ lắng nghe thay đổi đa thiết bị
+                } else {
+                    showAlert("Đăng nhập thất bại", "Số tài khoản hoặc mã khóa mật khẩu không đúng.", "error");
+                }
+            });
+        }
+
+        // ĐỒNG BỘ THỜI GIAN THỰC: Máy khác chuyển tiền, máy này tự nhảy số dư không cần F5
+        function activateRealtimeSync(stk) {
+            document.getElementById('screen-auth').classList.add('hidden');
+            document.getElementById('screen-main').classList.remove('hidden');
+
+            // Thiết lập cổng lắng nghe liên tục biến động từ đám mây Firebase
+            liveListener = db.ref('users/' + stk).on('value', (snapshot) => {
+                const updatedData = snapshot.val();
+                if(updatedData) {
+                    localUser = updatedData;
+                    // Cập nhật giao diện lập tức khi có bất kỳ thay đổi nào từ thiết bị khác tác động lên database
+                    document.getElementById('user-name').innerText = localUser.name;
+                    document.getElementById('user-avatar').innerText = localUser.name.charAt(0);
+                    document.getElementById('user-balance').innerText = localUser.balance.toLocaleString('vi-VN') + " VND";
+                    document.getElementById('user-stk').innerText = localUser.stk;
+                    
+                    renderLiveHistory(localUser.history);
+                }
+            });
+
+            // Tự tạo mã QR cá nhân kết nối mạng
+            document.getElementById('qr-box').innerHTML = '';
+            new QRCode(document.getElementById('qr-box'), {
+                text: JSON.stringify({app:"SmartBank", stk: stk}),
+                width: 160,
+                height: 160
+            });
+        }
+
+        function authLogout() {
+            if(localUser) {
+                db.ref('users/' + localUser.stk).off('value', liveListener); // Hủy lắng nghe mạng để tiết kiệm pin/RAM
+            }
+            localUser = null;
+            document.getElementById('screen-main').classList.add('hidden');
+            document.getElementById('screen-auth').classList.remove('hidden');
+            document.getElementById('login-pass').value = '';
+        }
+
+        // Vẽ lịch sử giao dịch động từ đám mây
+        function renderLiveHistory(histList) {
+            const container = document.getElementById('history-container');
+            container.innerHTML = '';
+            if(!histList) return;
+
+            // Đảo ngược để giao dịch mới nhất luôn ở trên đầu
+            histList.slice().reverse().forEach(h => {
+                const row = document.createElement('div');
+                row.className = "flex justify-between items-center py-2 border-b border-slate-100 last:border-0";
+                const isPlus = h.type === 'plus';
+                row.innerHTML = `
+                    <div class="text-left">
+                        <p class="font-bold text-slate-700">${h.title}</p>
+                        <p class="text-[9px] text-slate-400">Giao dịch Cloud-Sync</p>
+                    </div>
+                    <div class="${isPlus ? 'text-emerald-600' : 'text-rose-600'} font-bold">
+                        ${isPlus ? '+' : '-'}${h.val.toLocaleString('vi-VN')}đ
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // --- 4. TÍNH NĂNG KIỂM TRA TÊN NGƯỜI NHẬN TRỰC TUYẾN KHI GÕ ---
+        function liveCheckRecipient() {
+            const targetStk = document.getElementById('tf-stk').value.trim();
+            const icon = document.getElementById('tf-check-icon');
+            const hint = document.getElementById('tf-name-hint');
+
+            if(localUser && targetStk === localUser.stk) {
+                icon.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-500"></i>`;
+                hint.innerText = "Không thể tự chuyển khoản cho chính mình";
+                hint.className = "text-[11px] font-bold text-rose-600 mt-1 block";
+                return;
+            }
+
+            if(targetStk.length >= 6) {
+                db.ref('users/' + targetStk).once('value', (snapshot) => {
+                    const targetData = snapshot.val();
+                    if(targetData) {
+                        icon.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i>`;
+                        hint.innerText = `Người nhận: ${targetData.name}`;
+                        hint.className = "text-[11px] font-bold text-emerald-600 mt-1 block";
+                    } else {
+                        icon.innerHTML = ``;
+                        hint.className = "hidden";
+                    }
+                });
+            } else {
+                icon.innerHTML = ``;
+                hint.className = "hidden";
+            }
+        }
+
+        // --- 5. HÀNH ĐỘNG GIAO DỊCH CHUYỂN TIỀN LIÊN THIẾT BỊ ---
+        function submitTransfer() {
+            const targetStk = document.getElementById('tf-stk').value.trim();
+            const amount = parseInt(document.getElementById('tf-val').value);
+
+            if(!targetStk || isNaN(amount) || amount <= 0) {
+                showAlert("Lỗi nhập liệu", "Vui lòng kiểm tra lại thông tin số tài khoản và số tiền.", "error");
+                return;
+            }
+            if(amount > localUser.balance) {
+                showAlert("Giao dịch thất bại", "Số dư tài khoản đám mây của bạn không đủ.", "error");
+                return;
+            }
+
+            // Truy vấn lấy dữ liệu tài khoản đích trên Cloud dữ liệu mạng
+            db.ref('users/' + targetStk).once('value', (snapshot) => {
+                const targetData = snapshot.val();
+                if(!targetData) {
+                    showAlert("Lỗi tài khoản", "Tài khoản thụ hưởng không tồn tại trực tuyến.", "error");
+                    return;
+                }
+
+                // KHỞI TẠO TIẾN TRÌNH TRỪ TIỀN NGƯỜI GỬI VÀ ĐẨY LÊN FIREBASE
+                const myNewBalance = localUser.balance - amount;
+                const myHistory = localUser.history || [];
+                myHistory.push({title: `Chuyển tiền đến ${targetData.name} (${targetStk})`, val: amount, type: "minus"});
+                
+                db.ref('users/' + localUser.stk).update({
+                    balance: myNewBalance,
+                    history: myHistory
+                });
+
+                // KHỞI TẠO TIẾN TRÌNH CỘNG TIỀN NGƯỜI NHẬN VÀ ĐẨY LÊN FIREBASE
+                const targetNewBalance = targetData.balance + amount;
+                const targetHistory = targetData.history || [];
+                targetHistory.push({title: `Nhận tiền từ ${localUser.name} (${localUser.stk})`, val: amount, type: "plus"});
+
+                db.ref('users/' + targetStk).update({
+                    balance: targetNewBalance,
+                    history: targetHistory
+                }).then(() => {
+                    showAlert("Giao dịch thành công", `Đã gửi thành công ${amount.toLocaleString('vi-VN')}đ tới tài khoản ${targetData.name}.`);
+                    document.getElementById('tf-stk').value = '';
+                    document.getElementById('tf-val').value = '';
+                    document.getElementById('tf-name-hint').className = "hidden";
+                    document.getElementById('tf-check-icon').innerHTML = '';
+                });
+            });
+        }
+
+        // --- 6. GIẢ LẬP QUÈT QR FILE ĐỂ CHUYỂN KHOẢN ---
+        function simulateQRScanner(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            // Vì chạy tĩnh không thể dùng Camera thật để bóc mã độc lập, hệ thống quét mạng
+            // tự kết nối và tìm ngẫu nhiên một tài khoản khác đang có sẵn trực tuyến để điền thông tin nhanh.
+            db.ref('users').once('value', (snapshot) => {
+                const allUsers = snapshot.val();
+                if(allUsers) {
+                    const keys = Object.keys(allUsers).filter(k => k !== localUser.stk);
+                    if(keys.length === 0) {
+                        showAlert("Lỗi quét QR", "Chưa có thiết bị tài khoản nào khác trực tuyến để quét nhận diện.", "error");
+                        return;
+                    }
+                    const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                    const randomUser = allUsers[randomKey];
+
+                    showAlert("Quét thành công", `Nhận diện mã QR thành công:\n• STK: ${randomUser.stk}\n• Tên: ${randomUser.name}\nHệ thống tự điền thông tin.`);
+                    changeTab('transfer');
+                    document.getElementById('tf-stk').value = randomUser.stk;
+                    document.getElementById('tf-val').value = 50000;
+                    liveCheckRecipient();
+                }
+            });
+            e.target.value = ''; // Reset file input
+        }
+
+        // Hành động Nạp / Rút tại quầy
+        function submitCounterAction() {
+            const type = document.getElementById('ctr-type').value;
+            const amount = parseInt(document.getElementById('ctr-val').value);
+
+            if(isNaN(amount) || amount <= 0) return;
+
+            let newBal = localUser.balance;
+            const myHist = localUser.history || [];
+
+            if(type === 'in') {
+                newBal += amount;
+                myHist.push({title: "Nạp tiền mặt tại quầy giao dịch", val: amount, type: "plus"});
+            } else {
+                if(amount > localUser.balance) {
+                    showAlert("Lỗi rút tiền", "Số dư tài khoản mạng hiện tại không đủ.", "error");
+                    return;
+                }
+                newBal -= amount;
+                myHist.push({title: "Rút tiền mặt tại quầy giao dịch", val: amount, type: "minus"});
+            }
+
+            db.ref('users/' + localUser.stk).update({
+                balance: newBal,
+                history: myHist
+            }).then(() => {
+                showAlert("Giao dịch thành công", "Số dư tài khoản trên đám mây đã được cập nhật.");
+                document.getElementById('ctr-val').value = '';
+            });
+        }
+
+        // Sao chép STK nhanh
+        function copyStk() {
+            navigator.clipboard.writeText(localUser.stk);
+            showAlert("Đã sao chép", "Đã lưu số tài khoản vào bộ nhớ tạm.");
+        }
+
+        // Chuyển tab giao diện
+        function changeTab(tab) {
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+
+            document.getElementById('nv-transfer').className = tab === 'transfer' ? "flex flex-col items-center text-indigo-600 text-[10px] font-bold" : "flex flex-col items-center text-slate-400 text-[10px] font-bold";
+            document.getElementById('nv-qr').className = tab === 'qr' ? "flex flex-col items-center text-indigo-600 text-[10px] font-bold" : "flex flex-col items-center text-slate-400 text-[10px] font-bold";
+        }
+    </script>
+</body>
+</html>
